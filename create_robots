@@ -1,0 +1,2 @@
+# File to import and initiliase all robotic arms from their own files
+# 1 sub file per robotic arm to be read in here and then created within the environment
