@@ -12,6 +12,5 @@ def main():
 	create_static_environment(env)
 	env.hold()
 
-test
 if __name__ == "__main__":
 	main()
