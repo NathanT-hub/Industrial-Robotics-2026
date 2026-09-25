@@ -6,8 +6,8 @@ import swift
 from create_static_environment import create_static_environment
 
 # Import robot models
-from RS007N import RS007N
-from DoBot6 import DoBot6
+# from RS007N import RS007N
+# from DoBot6 import DoBot6
 
 def main():
 	"""Start Swift and build the static project environment."""

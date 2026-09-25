@@ -24,5 +24,4 @@ class  DoBot6(UTSMeshRobot):
             rtb.RevoluteDH(d = , a = , alpha = )
             rtb.RevoluteDH(d = , a = , alpha = )
         ]
-
         return links
