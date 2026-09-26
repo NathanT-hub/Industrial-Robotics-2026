@@ -18,7 +18,7 @@ def main():
 	create_static_environment(env)
 	
 	# Add DoBot6 Robot into environment
-	robot = DoBot6(base=SE3.Trans(0, 0, 0.6))
+	robot = DoBot6(base=SE3.Trans(0, -0.60, 0.6))
 	robot.add_to_env(env)
 
 	env.step(0.05)
