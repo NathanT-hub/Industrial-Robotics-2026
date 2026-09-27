@@ -62,7 +62,6 @@ def create_table(env, x, y, length, width, height):
                 color = [0.6, 0.6, 0.65, 1]
             )
             parts.append(leg)
-
     return parts
 
 def create_conveyor(env, length, width, height, base):
@@ -112,10 +111,7 @@ def create_conveyor(env, length, width, height, base):
             color = frame_color
         )
         parts.append(roller)
-
     parts.append(belt)
-
-
 
     return parts
 
