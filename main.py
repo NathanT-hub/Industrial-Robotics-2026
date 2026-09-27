@@ -6,6 +6,7 @@ from spatialmath import SE3
 
 # Import required files
 from create_static_environment import create_static_environment
+from robot_move import robot_move
 
 # Import robot models
 # from RS007N import RS007N
@@ -22,6 +23,12 @@ def main():
 	robot.add_to_env(env)
 
 	env.step(0.05)
+	path = robot_move(robot, [0.2, 0, 0.75])
+
+	for q in path.q:
+		robot.q = q
+		env.step(0.05)
+
 	env.hold()
 
 if __name__ == "__main__":
