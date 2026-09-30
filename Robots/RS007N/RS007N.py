@@ -1,6 +1,6 @@
 import os
 from math import pi
- 
+import numpy as np
 import roboticstoolbox as rtb
  
 from ir_support.robots.UTSMeshRobot import UTSMeshRobot
@@ -12,6 +12,20 @@ class RS007N(UTSMeshRobot):
     """
  
     manufacturer_url = "https://kawasakirobotics.com/asia-oceania/products-robots/rs007n/"
+
+     # Pose (world frame, at home_q = [0]*6) of each mesh file's own local
+    # origin, taken from Kawasaki's official xacro. Link0 (base) then link1..link6.
+    # The meshes are exported in Kawasaki's own per-link frame, which isn't the
+    # same as our DH frames, so without this the meshes render misaligned.
+    _MESH_HOME_POSES = [
+        np.array([[1, 0, 0, 0.000], [0, 1, 0, 0], [0, 0, 1, 0.000], [0, 0, 0, 1]], dtype=float),
+        np.array([[1, 0, 0, 0.000], [0, 1, 0, 0], [0, 0, 1, 0.360], [0, 0, 0, 1]], dtype=float),
+        np.array([[1, 0, 0, 0.000], [0, 1, 0, 0], [0, 0, 1, 0.360], [0, 0, 0, 1]], dtype=float),
+        np.array([[1, 0, 0, 0.000], [0, 1, 0, 0], [0, 0, 1, 0.715], [0, 0, 0, 1]], dtype=float),
+        np.array([[1, 0, 0, 0.000], [0, 1, 0, 0], [0, 0, 1, 1.090], [0, 0, 0, 1]], dtype=float),
+        np.array([[1, 0, 0, 0.000], [0, 1, 0, 0], [0, 0, 1, 1.090], [0, 0, 0, 1]], dtype=float),
+        np.array([[1, 0, 0, 0.000], [0, 1, 0, 0], [0, 0, 1, 1.168], [0, 0, 0, 1]], dtype=float),
+    ]
  
     def __init__(self, base=None):
         links = [
@@ -36,4 +50,5 @@ class RS007N(UTSMeshRobot):
             name="RS007N",
             home_q=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             base=base,
+            qtest_transforms=self._MESH_HOME_POSES,   # <Creates accurate placement of meshes in world coordinate frame
         )
