@@ -24,9 +24,11 @@ def main():
 	# robot = DoBot6(base=SE3.Trans(0, -0.60, 0.6))   Had to comment this out for now; you're missing some of the qlim paramters and the progam won't run
 	# robot.add_to_env(env)
 
-	# Add DoBot6 Robot into environment
+	# Add NathanBot Robot into environment
 	nathanBot = RS007N(base=SE3.Trans(-0.6, 0, 0.6))
 	nathanBot.add_to_env(env)
+
+
 
 	env.step(0.05)
 	# path = robot_move(robot, [0.2, 0, 0.75])
