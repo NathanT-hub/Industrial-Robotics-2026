@@ -1,16 +1,18 @@
 # Import required libraries
 import time
 import swift
-
 from spatialmath import SE3
 
-# Import required files
+# Import required files from GitHub Repo
 from create_static_environment import create_static_environment
 from robot_move import robot_move
+from move_arm_rmrc import move_arm_rmrc
 
 # Import robot models
-# from RS007N import RS007N
-from DoBot6 import DoBot6
+from Robots.RS007N import RS007N
+print(RS007N)
+
+# from DoBot6 import DoBot6
 
 def main():
 	"""Start Swift and build the static project environment."""
@@ -19,15 +21,19 @@ def main():
 	create_static_environment(env)
 	
 	# Add DoBot6 Robot into environment
-	robot = DoBot6(base=SE3.Trans(0, -0.60, 0.6))
-	robot.add_to_env(env)
+	# robot = DoBot6(base=SE3.Trans(0, -0.60, 0.6))   Had to comment this out for now; you're missing some of the qlim paramters and the progam won't run
+	# robot.add_to_env(env)
+
+	# Add DoBot6 Robot into environment
+	nathanBot = RS007N(base=SE3.Trans(-0.6, 0, 0.6))
+	nathanBot.add_to_env(env)
 
 	env.step(0.05)
-	path = robot_move(robot, [0.2, 0, 0.75])
+	# path = robot_move(robot, [0.2, 0, 0.75])
 
-	for q in path.q:
-		robot.q = q
-		env.step(0.05)
+	# for q in path.q:
+	# 	robot.q = q
+	# 	env.step(0.05)
 
 	env.hold()
 
