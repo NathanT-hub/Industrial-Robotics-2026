@@ -4,6 +4,7 @@ import swift
 from spatialmath import SE3
 from ir_support import RectangularPrism
 import numpy as np
+from math import pi
 
 # Import required files from GitHub Repo
 from create_static_environment import create_static_environment
@@ -49,14 +50,14 @@ def main():
 	nathanBot.q = q_start
 
 	T1 = nathanBot.fkine(nathanBot.q)
-	T2 = SE3(0.3, 0, 0) * T1   # move 30cm in world X
+	T2 = SE3(-1.4, 0, 0.75) * SE3.Rx(pi)   # roughly above the bearing table, gripper facing down
 
 	# obstacle sitting right on the straight line between T1 and T2
 	midpoint = (T1.t + T2.t) / 2
 	vertices, faces, face_normals = RectangularPrism(0.15, 0.15, 0.15, center=midpoint).get_data()
 
 	q_matrix = move_arm_rmrc(nathanBot, T1, T2)
-	
+
 	# --- TEMP DIAGNOSTIC: how close did any link actually get to the obstacle? ---
 	min_dist = float('inf')
 	for q in q_matrix:
