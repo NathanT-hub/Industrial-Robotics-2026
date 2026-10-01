@@ -8,6 +8,7 @@ from math import pi
 from spatialmath import SE3
 from spatialgeometry import Cuboid, Cylinder
 from ir_support_extra_parts.parts import part_mesh
+from spatialmath.base import trotz
 
 def create_static_environment(env):
     # Add all static items to swift environment
@@ -16,10 +17,69 @@ def create_static_environment(env):
     static_items = {}
     static_items["assembly_bench"] = create_table(env, 0, 0, 0.40, 0.40, surface_height)
     static_items["arm1_table"] = create_table(env, 0, -0.6, 0.40, 0.40, surface_height)
-    static_items["arm2_table"] = create_table(env, -0.6, 0, 0.40, 0.40, surface_height)
+    static_items["arm2_table"] = create_table(env, -0.8, 0, 0.40, 0.40, surface_height)
     static_items["arm3_table"] = create_table(env, 0, 0.6, 0.40, 0.40, surface_height)
 
     static_items["conveyor1"] = create_conveyor(env, 1.6, 0.4, surface_height, SE3.Trans(0.42, -1.2, 0) * SE3.Rz(pi/2))
+
+    # ---------------------------------------------------------------
+    # Setting up workspace |safety features|
+    # ---------------------------------------------------------------
+    # North wall (y=2.5), running along x
+    barrier1_pose = SE3(-1.739, 2.5, 0.0)
+    barrier2_pose = SE3(-0.580, 2.5, 0.0)
+    barrier3_pose = SE3(0.580, 2.5, 0.0)
+    barrier4_pose = SE3(1.739, 2.5, 0.0)
+
+    # East wall (x=2.5), running along y - rotated 90 degrees
+    barrier5_pose = SE3(2.5, -1.739, 0.0) * SE3.Rz(pi / 2)
+    barrier6_pose = SE3(2.5, -0.580, 0.0) * SE3.Rz(pi / 2)
+    barrier7_pose = SE3(2.5, 0.580, 0.0) * SE3.Rz(pi / 2)
+    barrier8_pose = SE3(2.5, 1.739, 0.0) * SE3.Rz(pi / 2)
+
+    # West wall (x=-2.5), running along y - rotated 90 degrees
+    barrier9_pose = SE3(-2.5, -1.739, 0.0) * SE3.Rz(pi / 2)
+    barrier10_pose = SE3(-2.5, -0.580, 0.0) * SE3.Rz(pi / 2)
+    barrier11_pose = SE3(-2.5, 0.580, 0.0) * SE3.Rz(pi / 2)
+    barrier12_pose = SE3(-2.5, 1.739, 0.0) * SE3.Rz(pi / 2)
+
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier1_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier2_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier3_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier4_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier5_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier6_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier7_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier8_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier9_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier10_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier11_pose, color="#f2c14e"))
+    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier12_pose, color="#f2c14e"))
+
+    # South gate (y=-2.5, open side, closest to the camera)
+    light_curtain_left_pose = SE3(-2.5, -2.5, 0.0)
+    light_curtain_right_pose = SE3(2.5, -2.5, 0.0)
+
+    env.add(part_mesh("SafetyLightCurtain", pose=light_curtain_left_pose, color="#e8491d"))
+    env.add(part_mesh("SafetyLightCurtain", pose=light_curtain_right_pose, color="#e8491d"))
+
+    # Worker station: 1m outside the west wall (x=-2.5), near the gate,
+    # rotated to face the actual work (the table/UR3e at 0.6, 0.0)
+    worker_station_pose = SE3(-3.5, -2.5, 0.0) *trotz(pi)
+    estop_post_height = 2.0
+    estop_post_pose = worker_station_pose * SE3(0.15, 0, 1)
+    estop_post = Cuboid(scale=[0.15, 0.15, 2], pose=estop_post_pose, color="#555555")
+    env.add(estop_post)
+
+    # Button mounted on the made post
+    estop_pose = worker_station_pose * SE3(0, 0, estop_post_height/2) 
+    env.add(part_mesh("emergencyStopWallMounted", pose=estop_pose, color="#cc0000"))
+
+    # SafetyPerson standing beside the post, offset sideways so they don't
+    # overlap it, facing the same direction (toward the cell)
+    safety_person_pose = worker_station_pose * SE3(0, 0.4, 0.0)
+    env.add(part_mesh("SafetyPerson", pose=safety_person_pose))
+
 
     # Iterate through each list within the dictionary
     for item in static_items.values():

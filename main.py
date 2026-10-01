@@ -25,7 +25,7 @@ def main():
 	# robot.add_to_env(env)
 
 	# Add DoBot6 Robot into environment
-	nathanBot = RS007N(base=SE3.Trans(-0.6, 0, 0.6))
+	nathanBot = RS007N(base=SE3.Trans(-0.8, 0, 0.6))
 	nathanBot.add_to_env(env)
 
 	env.step(0.05)
