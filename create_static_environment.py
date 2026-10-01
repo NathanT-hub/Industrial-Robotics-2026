@@ -19,8 +19,11 @@ def create_static_environment(env):
     static_items["arm1_table"] = create_table(env, 0, -0.6, 0.40, 0.40, surface_height)
     static_items["arm2_table"] = create_table(env, -0.8, 0, 0.40, 0.40, surface_height)
     static_items["arm3_table"] = create_table(env, 0, 0.6, 0.40, 0.40, surface_height)
+    static_items["bearing_table"] = create_table(env, -1.4, 0, 0.40, 0.40, surface_height)
 
     static_items["conveyor1"] = create_conveyor(env, 1.6, 0.4, surface_height, SE3.Trans(0.42, -1.2, 0) * SE3.Rz(pi/2))
+    static_items["bearing"] = create_bearing(env, -1.4, 0, surface_height, outer_diameter=0.08, inner_diameter=0.03, height=0.02)
+
 
     # ---------------------------------------------------------------
     # Setting up workspace |safety features|
@@ -122,6 +125,35 @@ def create_table(env, x, y, length, width, height):
                 color = [0.6, 0.6, 0.65, 1]
             )
             parts.append(leg)
+    return parts
+
+def create_bearing(env, x, y, z, outer_diameter=0.08, inner_diameter=0.03, height=0.02):
+    """
+    Visual approximation of a bearing for pick-and-place: a solid outer
+    ring (OD) with a darker inner cylinder (ID) to fake the bore -- no
+    real hole is modelled, since nothing needs to pass through it.
+    z is the surface it sits on (e.g. surface_height), not its centre.
+    """
+    parts = []
+
+    outer = Cylinder(
+        radius=outer_diameter / 2,
+        length=height,
+        pose=SE3.Trans(x, y, z + height / 2),  # centre offset so it sits ON the surface
+        color=[0.75, 0.75, 0.78, 1]
+    )
+    parts.append(outer)
+
+    # fake the bore -- slightly taller so it pokes through top and bottom
+    # and doesn't z-fight with the outer cylinder's faces
+    bore = Cylinder(
+        radius=inner_diameter / 2,
+        length=height * 1.05,
+        pose=SE3.Trans(x, y, z + height / 2),
+        color=[0.05, 0.05, 0.05, 1]
+    )
+    parts.append(bore)
+
     return parts
 
 def create_conveyor(env, length, width, height, base):

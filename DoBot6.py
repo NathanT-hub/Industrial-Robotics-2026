@@ -36,7 +36,7 @@ class DoBot6(UTSMeshRobot):
     # Offset creates standard starting position
     def _create_DH(self):
         links = [
-            rtb.RevoluteDH(d = 0.1668, a = 0, alpha = pi/2, offset = -pi/2, qlim = ),
+            rtb.RevoluteDH(d = 0.1668, a = 0, alpha = pi/2, offset = -pi/2,),
             rtb.RevoluteDH(d = 0, a = 0.18906, alpha = 0, offset = pi/2),
             rtb.RevoluteDH(d = 0, a = 0.1600, alpha = 0, offset = 0),
             rtb.RevoluteDH(d = 0.08600, a = 0, alpha = pi/2, offset = pi/2),
