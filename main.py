@@ -12,6 +12,9 @@ from move_arm_rmrc import move_arm_rmrc
 from Robots.RS007N import RS007N
 print(RS007N)
 
+#from Robots.ReBotB601 import ReBotB601
+#print(ReBotB601)
+
 # from DoBot6 import DoBot6
 
 def main():
@@ -25,8 +28,12 @@ def main():
 	# robot.add_to_env(env)
 
 	# Add DoBot6 Robot into environment
-	nathanBot = RS007N(base=SE3.Trans(-0.8, 0, 0.6))
+	nathanBot = RS007N(base=SE3.Trans(-0.6, 0, 0.6))
 	nathanBot.add_to_env(env)
+
+	# Add reBot B601-DM Robot into environment
+	#ryanBot = ReBotB601(base=SE3.Trans(0, 0.6, 0.6))
+	#ryanBot.add_to_env(env)
 
 	env.step(0.05)
 	# path = robot_move(robot, [0.2, 0, 0.75])
