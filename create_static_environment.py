@@ -9,6 +9,8 @@ from spatialmath import SE3
 from spatialgeometry import Cuboid, Cylinder
 from ir_support_extra_parts.parts import part_mesh
 from spatialmath.base import trotz
+import spatialgeometry as geometry
+import os
 
 def create_static_environment(env):
     # Add all static items to swift environment
@@ -16,11 +18,11 @@ def create_static_environment(env):
     # Create a dictionary to hold all static items as a list of their parts (Shapes)
     static_items = {}
     static_items["assembly_bench"] = create_table(env, 0, 0, 0.40, 0.40, surface_height)
-    static_items["arm1_table"] = create_table(env, 0, -0.6, 0.40, 0.40, surface_height)
+    static_items["arm1_table"] = create_table(env, 0, -0.45, 0.40, 0.40, surface_height) # 5cm gap to the assembly bench so DoBot6 can reach it
     static_items["arm2_table"] = create_table(env, -0.6, 0, 0.40, 0.40, surface_height)
     static_items["arm3_table"] = create_table(env, 0, 0.6, 0.40, 0.40, surface_height)
     static_items["bearing_table"] = create_table(env, -1.2, 0, 0.40, 0.40, surface_height)
-    static_items["dispatch_table"] = create_table(env, 0, -1.2, 0.40, 0.40, surface_height)
+    static_items["dispatch_table"] = create_table(env, 0, 1.2, 0.40, 0.40, surface_height)
 
     static_items["conveyor1"] = create_conveyor(env, 1.6, 0.4, surface_height, SE3.Trans(0.42, -1.2, 0) * SE3.Rz(pi/2))
 
@@ -127,7 +129,7 @@ def create_table(env, x, y, length, width, height):
             parts.append(leg)
     return parts
 
-def create_bearing(env, x, y, z, outer_diameter=0.08, inner_diameter=0.03, height=0.02):
+def create_bearing(env, x, y, z, outer_diameter=0.032, inner_diameter=0.01, height=0.01):
     """
     Visual approximation of a bearing for pick-and-place: a solid outer
     ring (OD) with a darker inner cylinder (ID) to fake the bore -- no
@@ -155,6 +157,20 @@ def create_bearing(env, x, y, z, outer_diameter=0.08, inner_diameter=0.03, heigh
     parts.append(bore)
 
     return parts
+
+#-------------------------------------------------------------------
+#--------------- Wheel STL file ------------------------------------
+_MESH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wheel_meshes')
+
+def create_wheel(env, x, y, z, yaw=0.0):
+    rim_path = os.path.join(_MESH_DIR, 'wheel_rim.stl')
+    tyre_path = os.path.join(_MESH_DIR, 'wheel_tyre.stl')
+
+    pose = SE3.Trans(x, y, z + 0.005) * SE3.Rz(yaw)
+    rim = geometry.Mesh(rim_path, color=[0.75, 0.75, 0.78, 1], pose=pose)
+    tyre = geometry.Mesh(tyre_path, color=[0.08, 0.08, 0.08, 1], pose=pose)
+
+    return [rim, tyre]
 
 def create_conveyor(env, length, width, height, base):
     belt_color = (0.08, 0.08, 0.08, 1)
@@ -206,6 +222,19 @@ def create_conveyor(env, length, width, height, base):
     parts.append(belt)
 
     return parts
+
+"""
+Blocking conveyor run: slides parts along world +y from start_y to stop_y, then stops
+(acts like an end-stop sensor so the robot always knows where to pick from).
+"""
+def run_conveyor(env, parts, start_y, stop_y, speed=0.2, dt=0.05):
+    y = start_y
+    while y < stop_y:
+        dy = min(speed * dt, stop_y - y) # Don't overshoot the stop point
+        for part in parts:
+            part.T = SE3.Trans(0, dy, 0) * SE3(part.T)
+        y += dy
+        env.step(dt)
 
 
 
