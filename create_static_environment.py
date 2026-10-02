@@ -17,13 +17,12 @@ def create_static_environment(env):
     static_items = {}
     static_items["assembly_bench"] = create_table(env, 0, 0, 0.40, 0.40, surface_height)
     static_items["arm1_table"] = create_table(env, 0, -0.6, 0.40, 0.40, surface_height)
-    static_items["arm2_table"] = create_table(env, -0.8, 0, 0.40, 0.40, surface_height)
+    static_items["arm2_table"] = create_table(env, -0.6, 0, 0.40, 0.40, surface_height)
     static_items["arm3_table"] = create_table(env, 0, 0.6, 0.40, 0.40, surface_height)
-    static_items["bearing_table"] = create_table(env, -1.4, 0, 0.40, 0.40, surface_height)
+    static_items["bearing_table"] = create_table(env, -1.2, 0, 0.40, 0.40, surface_height)
     static_items["dispatch_table"] = create_table(env, 0, -1.2, 0.40, 0.40, surface_height)
 
     static_items["conveyor1"] = create_conveyor(env, 1.6, 0.4, surface_height, SE3.Trans(0.42, -1.2, 0) * SE3.Rz(pi/2))
-    static_items["bearing"] = create_bearing(env, -1.4, 0, surface_height, outer_diameter=0.08, inner_diameter=0.03, height=0.02)
 
 
     # ---------------------------------------------------------------

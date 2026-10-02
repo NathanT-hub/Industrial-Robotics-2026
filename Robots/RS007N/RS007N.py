@@ -52,3 +52,19 @@ class RS007N(UTSMeshRobot):
             base=base,
             qtest_transforms=self._MESH_HOME_POSES,   # <Creates accurate placement of meshes in world coordinate frame
         )
+
+    def ikine_LM(self, Tep, q0=None, **kwargs):
+        """
+        ikine_LM with a fix for joint 1's flip=True.
+
+        roboticstoolbox's ikine_LM solves on the ETS, which ignores flip=True,
+        while fkine() and jacob0() respect it -- so the raw IK solution comes
+        back with joint 1 mirrored. Negate flipped joints going in (q0) and
+        coming out (sol.q) so the result agrees with fkine().
+        """
+        flip_signs = np.array([-1.0 if link.isflip else 1.0 for link in self.links])
+        if q0 is not None:
+            q0 = np.asarray(q0, dtype=float) * flip_signs
+        sol = super().ikine_LM(Tep, q0=q0, **kwargs)
+        sol.q = sol.q * flip_signs
+        return sol

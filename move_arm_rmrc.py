@@ -9,31 +9,32 @@ def move_arm_rmrc(robot, T1, T2, steps=50, delta_t=0.05, q0=None,
     Move `robot`'s end-effector from pose T1 to T2 using Resolved Motion
     Rate Control, full 3D pose and any number of joints.
 
-    Note on robot.jacob0(): roboticstoolbox's analytic Jacobian has a sign
-    bug for any joint defined with flip=True (RS007N's joint 1). fkine() is
-    unaffected -- verified independently against a finite-difference
-    Jacobian. We correct for it below by flipping the sign of that joint's
-    column, rather than avoiding jacob0() altogether.
+    Closed-loop: each step's velocity is computed from the robot's *actual*
+    pose (fkine) to the next trajectory pose, so tracking errors from damping
+    or joint-limit clipping are corrected rather than accumulated.
     """
     if q0 is None:
         q0 = robot.q
 
     traj = ctraj(T1, T2, steps)
     q_matrix = np.zeros((steps, robot.n))
-    sol = robot.ikine_LM(T1, q0=q0)
-    if not sol.success:
-        raise RuntimeError("RMRC: inverse kinematics failed to find a starting pose at T1")
-    q_matrix[0, :] = sol.q
-
-    # correction for roboticstoolbox's flip=True Jacobian sign bug
-    flip_signs = np.array([-1.0 if link.isflip else 1.0 for link in robot.links])
+    q0 = np.asarray(q0, dtype=float)
+    if np.allclose(robot.fkine(q0).A, T1.A, atol=1e-4):
+        # already at T1 -- start from q0 so the arm doesn't jump to another IK branch
+        q_matrix[0, :] = q0
+    else:
+        sol = robot.ikine_LM(T1, q0=q0)
+        if not sol.success:
+            raise RuntimeError("RMRC: inverse kinematics failed to find a starting pose at T1")
+        q_matrix[0, :] = sol.q
 
     for i in range(steps - 1):
-        lin_vel = (traj[i + 1].t - traj[i].t) / delta_t
-        ang_vel = vex((traj[i + 1].R - traj[i].R) / delta_t @ traj[i].R.T)
+        T_actual = robot.fkine(q_matrix[i, :])
+        lin_vel = (traj[i + 1].t - T_actual.t) / delta_t
+        ang_vel = vex((traj[i + 1].R - T_actual.R) / delta_t @ T_actual.R.T)
         xdot = np.concatenate([lin_vel, ang_vel])
 
-        J = robot.jacob0(q_matrix[i, :]) * flip_signs
+        J = robot.jacob0(q_matrix[i, :])
 
         # damped least squares -- avoids qdot exploding near a singularity
         m = np.sqrt(max(np.linalg.det(J @ J.T), 0.0))
