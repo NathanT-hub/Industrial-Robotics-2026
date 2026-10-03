@@ -15,12 +15,13 @@ from execute_move import execute_move
 from check_collision import is_collision
 
 # Import robot models
+from DoBot6 import DoBot6
+
 from Robots.RS007N import RS007N
 
-# from Robots.ReBotB601 import ReBotB601
-#print(ReBotB601)
+from Robots.reBotB601 import ReBotB601
 
-from DoBot6 import DoBot6
+
 
 def main():
 	"""Start Swift and build the static project environment."""
@@ -58,8 +59,8 @@ def main():
 	nathanBot.add_to_env(env)
 
 	# Add reBot B601-DM Robot into environment
-	# ryanBot = ReBotB601(base=SE3.Trans(0, 0.6, 0.6))
-	# ryanBot.add_to_env(env)
+	ryanBot = ReBotB601(base=SE3.Trans(0, 0.6, 0.6))
+	ryanBot.add_to_env(env)
 
 	env.step(0.05)
 
@@ -75,10 +76,13 @@ def main():
 #----------------------------------------------------------------
 	# Waypoints: hover above the wheel, descend to grasp, lift, carry, descend to place, release, lift
 	wheel_place_x, wheel_place_y = 0, 0
+	# The wheel lies flat and its top is ~15mm above the surface; the DoBot6 Link6 mesh protrudes ~19mm
+	# past the end-effector frame, so grasp ~20mm above the wheel top so the flange face rests on it
+	wheel_grasp_z = surface_height + 0.0155 + 0.02
 	T_hover_wheel = SE3(wheel_x, wheel_pick_y, 0.75) * SE3.Rx(pi)
-	T_grasp_wheel = SE3(wheel_x, wheel_pick_y, surface_height + 0.015) * SE3.Rx(pi) # top of the wheel
+	T_grasp_wheel = SE3(wheel_x, wheel_pick_y, wheel_grasp_z) * SE3.Rx(pi) # flange on top of the wheel
 	T_hover_wheel_place = SE3(wheel_place_x, wheel_place_y, 0.75) * SE3.Rx(pi)
-	T_grasp_wheel_place = SE3(wheel_place_x, wheel_place_y, surface_height + 0.015) * SE3.Rx(pi)
+	T_grasp_wheel_place = SE3(wheel_place_x, wheel_place_y, wheel_grasp_z) * SE3.Rx(pi)
 
 	# 1) Move from the ready pose down to the wheel (nothing carried)
 	execute_move(env, robot, T_hover_wheel)
