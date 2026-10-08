@@ -178,9 +178,9 @@ def main():
 #----------------------------------------------------------------
 	# The pendant runs the main loop (steps Swift itself) until its window is closed, so it replaces env.hold()
 	# Comment Out function call when not needed in main
-	# pendant = TeachPendant(env, {"DoBot6": robot, "RS007N": nathanBot, "reBot B601": ryanBot},
-	# 					   min_tool_z=surface_height)
-	# pendant.run()
+	pendant = TeachPendant(env, {"DoBot6": robot, "RS007N": nathanBot, "reBot B601": ryanBot},
+						   min_tool_z=surface_height)
+	pendant.run()
 
 
 if __name__ == "__main__":
