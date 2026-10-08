@@ -60,7 +60,11 @@ def main():
 	nathanBot.add_to_env(env)
 
 	# Add reBot B601-DM Robot into environment
-	ryanBot = ReBotB601(base=SE3.Trans(0, 0.6, 0.6))
+	ryanBot = ReBotB601(base=SE3.Trans(0, 0.45, 0.6))  # centre of arm3_table
+	# Waiting pose: folded with the gripper pointing down and out toward +x, clear of the
+	# straight-up home pose, which RMRC can't start cleanly from
+	q_ready_rebot = np.radians([0, -72, -80, 68, 0, 0])
+	ryanBot.q = q_ready_rebot
 	ryanBot.add_to_env(env)
 
 	env.step(0.05)
@@ -128,14 +132,55 @@ def main():
 	# 3) Release and retreat -- bearing stays installed in the wheel
 	execute_move(env, nathanBot, T_hover_place)
 
+	# 4) Park folded up over arm2_table so the reBot has the assembly bench to itself in Step 4
+	T_park = SE3(-0.6, -0.25, 0.85) * SE3.Rx(pi)
+	execute_move(env, nathanBot, T_park)
+
+#----------------------------------------------------------------
+#					Step 4 | reBot moves the wheel + bearing assembly to the dispatch table
+#----------------------------------------------------------------
+	# The reBot's approach axis is its tool x-axis (not z), so SE3.Ry(pi/2) points the gripper straight down.
+	# The bench and dispatch table are both 0.45m from its base -- the edge of its reach with a vertical
+	# gripper -- so the hover height is kept at 0.70m (0.75m is out of reach there)
+	def rebot_pose(x, y, z, heading):
+		"""Gripper pose at (x, y, z), pointing straight down and turned to `heading` (rad, about world z)."""
+		return SE3(x, y, z) * SE3.Rz(heading) * SE3.Ry(pi/2)
+
+	assembly_parts = wheel_parts + bearing_parts
+	dispatch_x, dispatch_y = 0, 0.9  # centre of dispatch_table
+	# Gripper tip (the reBot's TCP) on top of the wheel, whose top face is ~15mm above the bench
+	assembly_grasp_z = wheel_base_z + 0.01
+
+	# Waypoints: hover above the assembly, descend to grasp, lift, swing round the +x side of the base
+	# (a straight line bench->dispatch passes through the robot), descend to place, release, lift
+	T_hover_assembly  = rebot_pose(wheel_place_x, wheel_place_y, 0.70, -pi/2)
+	T_grasp_assembly  = rebot_pose(wheel_place_x, wheel_place_y, assembly_grasp_z, -pi/2)
+	T_via_rebot       = rebot_pose(0.45, 0.45, 0.70, 0)
+	T_hover_dispatch  = rebot_pose(dispatch_x, dispatch_y, 0.70, pi/2)
+	T_grasp_dispatch  = rebot_pose(dispatch_x, dispatch_y, assembly_grasp_z, pi/2)
+
+	# 1) Move down to the assembly (nothing carried)
+	execute_move(env, ryanBot, T_hover_assembly)
+	execute_move(env, ryanBot, T_grasp_assembly)
+
+	# 2) Lift and carry round to the dispatch table -- wheel and bearing follow the end-effector together
+	execute_move(env, ryanBot, T_hover_assembly, payload=assembly_parts)
+	execute_move(env, ryanBot, T_via_rebot, payload=assembly_parts)
+	execute_move(env, ryanBot, T_hover_dispatch, payload=assembly_parts)
+	execute_move(env, ryanBot, T_grasp_dispatch, payload=assembly_parts)
+
+	# 3) Release, lift clear, then return to the waiting pose
+	execute_move(env, ryanBot, T_hover_dispatch)
+	execute_move(env, ryanBot, ryanBot.fkine(q_ready_rebot))
+
 #----------------------------------------------------------------
 #					Step # | Hand over to the teach/jog pendant
 #----------------------------------------------------------------
 	# The pendant runs the main loop (steps Swift itself) until its window is closed, so it replaces env.hold()
 	# Comment Out function call when not needed in main
-	pendant = TeachPendant(env, {"DoBot6": robot, "RS007N": nathanBot, "reBot B601": ryanBot},
-						   min_tool_z=surface_height)
-	pendant.run()
+	# pendant = TeachPendant(env, {"DoBot6": robot, "RS007N": nathanBot, "reBot B601": ryanBot},
+	# 					   min_tool_z=surface_height)
+	# pendant.run()
 
 
 if __name__ == "__main__":
