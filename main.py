@@ -22,8 +22,6 @@ from Robots.RS007N import RS007N
 
 from Robots.reBotB601 import ReBotB601
 
-
-
 def main():
 	"""Start Swift and build the static project environment."""
 	env = swift.Swift()
@@ -68,6 +66,19 @@ def main():
 	ryanBot.add_to_env(env)
 
 	env.step(0.05)
+
+#----------------------------------------------------------------
+#					Step # | Hand over to the teach/jog pendant
+#----------------------------------------------------------------
+	# attach() hooks env.step, so the pendant (and the E-stop) is serviced by every step the
+	# sequence below takes. Jogging is refused while auto_busy is True.
+	# On a PS4 Controller:
+	#						Circle = Estop
+	#						L3 BTN (left joystick) = Reset / resume
+	pendant = TeachPendant(env, {"DoBot6": robot, "RS007N": nathanBot, "reBot B601": ryanBot},
+						   min_tool_z=surface_height)
+	pendant.attach()
+	pendant.auto_busy = True
 
 #----------------------------------------------------------------
 #					Step 1 | Conveyor delivers the wheel to the DoBot6
@@ -174,14 +185,10 @@ def main():
 	execute_move(env, ryanBot, ryanBot.fkine(q_ready_rebot))
 
 #----------------------------------------------------------------
-#					Step # | Hand over to the teach/jog pendant
+#					Sequence finished | hand over to manual jogging
 #----------------------------------------------------------------
-	# The pendant runs the main loop (steps Swift itself) until its window is closed, so it replaces env.hold()
-	# Comment Out function call when not needed in main
-	pendant = TeachPendant(env, {"DoBot6": robot, "RS007N": nathanBot, "reBot B601": ryanBot},
-						   min_tool_z=surface_height)
-	pendant.run()
-
+	pendant.auto_busy = False
+	pendant.run()   # blocks until Ctrl+C; jogging is enabled again
 
 if __name__ == "__main__":
 	main()

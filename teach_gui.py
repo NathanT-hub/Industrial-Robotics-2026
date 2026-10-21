@@ -11,13 +11,26 @@ scene, that drives the robots already in the scene:
   - live state: status line (green / amber / red), end-effector pose, joint
     angles, manipulability, gamepad status and the most recent events
     (the full event log is also printed to the terminal)
-  - a latching software E-stop, and taught poses (record / go to / save / load)
+  - a latching software E-stop with separate Reset and Resume actions, and
+    taught poses (record / go to / save / load)
   - an optional gamepad (pygame) that mirrors the panel controls
 
-Swift only runs the widget callbacks inside env.step(), so the pendant owns
-the main loop -- call run() last in main(), in place of env.hold():
+Swift only runs the widget callbacks inside env.step(), so the pendant has to be
+serviced from every env.step() call. Two ways to use it:
+
+  Alongside an automatic sequence (non-blocking):
 
     pendant = TeachPendant(env, {"DoBot6": robot, "RS007N": nathanBot})
+    pendant.attach()            # hooks env.step so the pendant is serviced by every step
+    pendant.auto_busy = True    # manual jogging is refused while the sequence drives the robots
+    try:
+        ...                     # the sequence (execute_move etc.) -- E-stop freezes it in place
+    finally:
+        pendant.auto_busy = False
+    pendant.run()               # then full manual jogging until Ctrl+C
+
+  Stand-alone (blocking), in place of env.hold():
+
     pendant.run()
 """
 import json
@@ -96,6 +109,11 @@ class TeachPendant:
         self.sliders_follow = True  # push the robot's joint angles back onto the sliders
         self.slider_pushed = []     # per slider: values recently pushed by the pendant (echo filter)
 
+        self.auto_busy = False        # True while main()'s sequence is driving the robots
+        self.awaiting_resume = False  # E-stop reset done, but not yet resumed
+        self._real_step = None        # the original env.step, once attach() has hooked it
+        self._in_hook = False         # re-entry guard for the hook
+
         self.gamepad = None
         self.pad_mode = "cartesian"
         self.pad_joint = 0
@@ -111,17 +129,49 @@ class TeachPendant:
         return self.robots[self.robot_name]
 
     def run(self):
-        """Run the pendant; blocks until Ctrl+C."""
+        """Run the pendant on its own; blocks until Ctrl+C."""
         self._log(OK, "Pendant started - " + ", ".join(self.names))
         try:
             while True:
-                self.tick()
+                if self._real_step is None:  # when hooked, env.step() already ticks the pendant
+                    self.tick()
                 self.env.step(TICK)  # renders, and runs the panel callbacks
         except KeyboardInterrupt:
             self._log(OK, "Pendant closed")
         finally:
             if pygame is not None:
                 pygame.quit()
+
+    # ------------------------------------------------------------------
+    # Non-blocking operation: ride along on every env.step()
+    # ------------------------------------------------------------------
+    def attach(self):
+        """Service the pendant on every env.step(), from wherever it is called."""
+        if self._real_step is not None:
+            return
+        self._real_step = self.env.step
+        self.env.step = self._step_hook
+        self._log(OK, "Pendant attached to env.step")
+
+    def _step_hook(self, *args, **kwargs):
+        if self._in_hook:  # guard against re-entry
+            return self._real_step(*args, **kwargs)
+        self._in_hook = True
+        try:
+            self.tick()
+            self._real_step(*args, **kwargs)
+            # E-stop / awaiting resume: freeze the calling sequence right here.
+            # Each pass still renders and polls the pendant, so buttons and the gamepad work.
+            while self.estop or self.awaiting_resume:
+                self.tick()
+                self._real_step(TICK)
+        finally:
+            self._in_hook = False
+
+    def _resume(self):
+        if self.awaiting_resume and not self.estop:
+            self.awaiting_resume = False
+            self._log(OK, "Resumed")
 
     # ------------------------------------------------------------------
     # Panel layout (Swift shows elements in the order they are added)
@@ -137,6 +187,7 @@ class TeachPendant:
         self.status_label = self._add(swift.Label(""))
         self._add(swift.Button(lambda _: self._press_estop(), "🛑 E-STOP"))
         self._add(swift.Button(lambda _: self._reset_estop(), "Reset E-stop"))
+        self._add(swift.Button(lambda _: self._resume(), "▶ Resume"))
         self.robot_select = self._add(swift.Select(self._robot_selected, "Robot", self.names, 0))
         self._add(swift.Slider(self._set_speed, min=5, max=100, step=5, value=int(self.speed * 100),
                                desc="Speed", unit="%"))
@@ -221,7 +272,7 @@ class TeachPendant:
         value = float(value)
         if any(abs(value - pushed) < SLIDER_STEP / 2 for pushed in self.slider_pushed[joint]):
             return
-        if self.estop or joint >= self.robot.n:
+        if self.estop or self.auto_busy or joint >= self.robot.n:
             return
         if self.joint_target is None:
             self._stop_motion()
@@ -260,7 +311,9 @@ class TeachPendant:
     def _refuse_if_estopped(self, what):
         if self.estop:
             self._log(WARNING, f"{what} refused - E-STOP active")
-        return self.estop
+        elif self.auto_busy:
+            self._log(WARNING, f"{what} refused - automatic sequence running")
+        return self.estop or self.auto_busy
 
     def _stop_motion(self):
         self.joint_target = None
@@ -277,7 +330,8 @@ class TeachPendant:
     def _reset_estop(self):
         if self.estop:
             self.estop = False
-            self._log(OK, "E-STOP reset - motion enabled")
+            self.awaiting_resume = True
+            self._log(OK, "E-STOP reset - press Resume to continue")
 
     def _record_pose(self):
         label = f"P{len(self.taught) + 1}"
@@ -354,7 +408,7 @@ class TeachPendant:
         """One control cycle: gamepad, motion, monitoring, panel update. Call before each env.step()."""
         self.conditions = {}
         self._poll_gamepad()
-        if not self.estop:
+        if not self.estop and not self.auto_busy:
             self._apply_motion()
         self._check_state()
         self._refresh_panel()
@@ -464,6 +518,8 @@ class TeachPendant:
         q = np.array(r.q, dtype=float)
         if self.estop:
             self._flag(FAULT, "E-STOP active - press Reset E-stop to resume")
+        if self.awaiting_resume:
+            self._flag(WARNING, "Reset done - press Resume to continue")
         lo, hi = r.qlim
         for i in np.flatnonzero(np.minimum(q - lo, hi - q) < LIMIT_WARN):
             self._flag(WARNING, f"J{i + 1} near joint limit")
@@ -530,6 +586,8 @@ class TeachPendant:
         return [self._on_grid(q[j]) if j < robot.n else 0.0 for j in range(n_max)]
 
     def _activity(self):
+        if self.auto_busy:
+            return "automatic sequence running"
         if self.playback:
             return "moving to pose"
         pad = self._pad_command()
@@ -581,7 +639,11 @@ class TeachPendant:
         if BTN_B in pressed:
             self._press_estop()
         if BTN_START in pressed:
-            self._reset_estop()
+            # One button, two deliberate presses: first resets the E-stop, second resumes
+            if self.estop:
+                self._reset_estop()
+            else:
+                self._resume()
         if BTN_A in pressed:
             self.pad_mode = "joint" if self.pad_mode == "cartesian" else "cartesian"
             self._log(OK, f"Gamepad mode: {self.pad_mode}")
@@ -627,4 +689,4 @@ class TeachPendant:
         mapping = ("L-stick X/Y = world X/Y, R-stick Y = Z" if self.pad_mode == "cartesian"
                    else f"D-pad selects joint, L-stick Y jogs J{self.pad_joint + 1}")
         return (f"🎮 {self.gamepad.get_name()[:40]} - mode {self.pad_mode.upper()} (A toggles)",
-                f"{mapping} | B = E-stop, Start = reset, LB/RB = robot, Y = record")
+                f"{mapping} | B = E-stop, Start = reset then resume (press twice), LB/RB = robot, Y = record")
