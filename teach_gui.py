@@ -111,6 +111,7 @@ class TeachPendant:
 
         self.auto_busy = False        # True while main()'s sequence is driving the robots
         self.awaiting_resume = False  # E-stop reset done, but not yet resumed
+        self.collision = None         # message while an upcoming collision holds the sequence
         self._real_step = None        # the original env.step, once attach() has hooked it
         self._in_hook = False         # re-entry guard for the hook
 
@@ -171,7 +172,26 @@ class TeachPendant:
     def _resume(self):
         if self.awaiting_resume and not self.estop:
             self.awaiting_resume = False
+            self.collision = None
             self._log(OK, "Resumed")
+
+    def hold_for_collision(self, message):
+        """Called by execute_move when the path ahead is blocked: show a fault and freeze until Resume."""
+        self.collision = message
+        self.awaiting_resume = True
+
+    def add_obstacle_sliders(self, obstacle, lo=(-1.5, -2.0, 0.6), hi=(1.5, 1.5, 1.5)):
+        """Sliders that move the test obstacle live (the sliders keep working while the arm is held)."""
+        self._add(swift.Label("━━ OBSTACLE ━━ drag into a robot's path"))
+        for axis, name in enumerate("XYZ"):
+            self._add(swift.Slider(lambda v, a=axis: self._move_obstacle(obstacle, a, float(v)),
+                                min=lo[axis], max=hi[axis], step=0.01,
+                                value=float(obstacle.centre[axis]), desc=f"Obstacle {name}", unit="m"))
+
+    def _move_obstacle(self, obstacle, axis, value):
+        centre = obstacle.centre.copy()
+        centre[axis] = value
+        obstacle.move_to(*centre)
 
     # ------------------------------------------------------------------
     # Panel layout (Swift shows elements in the order they are added)
@@ -518,7 +538,9 @@ class TeachPendant:
         q = np.array(r.q, dtype=float)
         if self.estop:
             self._flag(FAULT, "E-STOP active - press Reset E-stop to resume")
-        if self.awaiting_resume:
+        if self.collision:
+            self._flag(FAULT, self.collision)
+        elif self.awaiting_resume:
             self._flag(WARNING, "Reset done - press Resume to continue")
         lo, hi = r.qlim
         for i in np.flatnonzero(np.minimum(q - lo, hi - q) < LIMIT_WARN):

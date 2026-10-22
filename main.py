@@ -11,9 +11,10 @@ from spatialgeometry import Cuboid
 from create_static_environment import create_static_environment, create_bearing, create_wheel, run_conveyor
 from robot_move import robot_move
 from move_arm_rmrc import move_arm_rmrc
-from execute_move import execute_move
+from execute_move import execute_move, set_collision_guard
 from check_collision import is_collision
 from teach_gui import TeachPendant
+from obstacle import Obstacle
 
 # Import robot models
 from DoBot6 import DoBot6
@@ -68,7 +69,7 @@ def main():
 	env.step(0.05)
 
 #----------------------------------------------------------------
-#					Step # | Hand over to the teach/jog pendant
+#					Step 0 | Initiate the teach/jog pendant
 #----------------------------------------------------------------
 	# attach() hooks env.step, so the pendant (and the E-stop) is serviced by every step the
 	# sequence below takes. Jogging is refused while auto_busy is True.
@@ -79,6 +80,14 @@ def main():
 						   min_tool_z=surface_height)
 	pendant.attach()
 	pendant.auto_busy = True
+
+#---------------------------------------------------------------
+#				   Collision Avoidance test
+	# Test obstacle, parked off to the side (tune the centre to your scene). Drag it into a path with the sliders
+	obstacle = Obstacle(env, size=(0.15, 0.15, 0.15), centre=(0.9, 0.9, 0.7))
+	pendant.add_obstacle_sliders(obstacle)
+	set_collision_guard([obstacle], pendant.hold_for_collision)
+#---------------------------------------------------------------
 
 #----------------------------------------------------------------
 #					Step 1 | Conveyor delivers the wheel to the DoBot6
