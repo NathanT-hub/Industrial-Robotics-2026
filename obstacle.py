@@ -25,7 +25,7 @@ _NORMALS = np.array([[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [
 
 
 class Obstacle:
-    def __init__(self, env, size=(0.15, 0.15, 0.15), centre=(0.8, 0.8, 0.7), margin=0.03,
+    def __init__(self, env, size=(0.15, 0.15, 0.15), centre=(0.8, 0.8, 0.7), margin=0.06,
                  color=(1.0, 0.5, 0.0, 0.8)):
         """
         env    -- the Swift environment
@@ -47,6 +47,29 @@ class Obstacle:
         self.vertices = self.centre + _SIGNS * half
         self.faces = _FACES
         self.face_normals = _NORMALS
+
+    def segment_hit(self, p1, p2):
+        """
+        Point where the segment p1 -> p2 first enters the (inflated) box, or None if it misses.
+        Slab test on the axis-aligned box. Unlike a face-crossing test, it also reports a
+        segment that starts or ends inside the box.
+        """
+        lo = self.centre - self.size / 2 - self.margin
+        hi = self.centre + self.size / 2 + self.margin
+        d = p2 - p1
+        t_in, t_out = 0.0, 1.0
+        for i in range(3):
+            if abs(d[i]) < 1e-12:                 # segment parallel to this pair of faces
+                if p1[i] < lo[i] or p1[i] > hi[i]:
+                    return None
+            else:
+                ta, tb = (lo[i] - p1[i]) / d[i], (hi[i] - p1[i]) / d[i]
+                if ta > tb:
+                    ta, tb = tb, ta
+                t_in, t_out = max(t_in, ta), min(t_out, tb)
+                if t_in > t_out:
+                    return None
+        return p1 + t_in * d
 
     def get_data(self):
         """(vertices, faces, face_normals), in the form is_collision() expects."""

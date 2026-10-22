@@ -13,15 +13,36 @@ at the predicted contact, and on_blocked() is called (the pendant uses it to lat
 fault and wait for Resume). The move carries on, from the same step, once the path is clear.
 """
 import numpy as np
+from spatialgeometry import Sphere
 from spatialmath import SE3
 
 from move_arm_rmrc import move_arm_rmrc
-from check_collision import is_collision
 
-CHECK_EVERY = 3     # look ahead once every this many steps of a move
-CHECK_STRIDE = 4    # ...testing every this-many'th remaining configuration (speed vs. resolution)
+CHECK_EVERY = 1       # look ahead once every this many steps of a move
+CHECK_STRIDE = 2      # ...testing every this-many'th remaining configuration (speed vs. resolution)
+TOOL_EXTENSION = 0.12 # m: gripper reach past the tool frame, checked as an extra segment
+TOOL_AXIS = {"ReBotB601": 0}  # which tool axis points out of the gripper (default 2 = z; the reBot uses x)
 
 _guard = {"obstacles": [], "on_blocked": None}
+
+# One red marker sphere, created on first use and re-used. env.remove() is avoided on purpose:
+# in this Swift version it leaves a None in the scene list and the next env.step() crashes.
+_marker = {"shape": None}
+_MARKER_PARKED = SE3(0, 0, -10)  # well below the floor, out of view
+
+
+def _show_marker(env, point):
+    if _marker["shape"] is None:
+        _marker["shape"] = Sphere(radius=0.02, color=[1.0, 0.0, 0.0, 1.0])
+        _marker["shape"].T = SE3(*point)
+        env.add(_marker["shape"])
+    else:
+        _marker["shape"].T = SE3(*point)
+
+
+def _hide_marker():
+    if _marker["shape"] is not None:
+        _marker["shape"].T = _MARKER_PARKED
 
 
 def set_collision_guard(obstacles, on_blocked=None):
@@ -42,25 +63,34 @@ def _as_list(payload):
     return [payload]
 
 
-def _path_blocked(robot, q_remaining, env=None, markers=None):
+def _path_blocked(robot, q_remaining, env=None):
     """True if any obstacle intersects the robot along the remaining configurations."""
     lookahead = np.vstack((q_remaining[::CHECK_STRIDE], q_remaining[-1]))
-    for obstacle in _guard["obstacles"]:
-        vertices, faces, normals = obstacle.get_data()
-        if is_collision(robot, lookahead, faces, vertices, normals, collisions=markers, env=env):
-            return True
+    tool_axis = TOOL_AXIS.get(type(robot).__name__, 2)
+    for q in lookahead:
+        frames = robot.fkine_all(q).A
+        points = [T[:3, 3] for T in frames]
+        points.append(frames[-1][:3, 3] + frames[-1][:3, tool_axis] * TOOL_EXTENSION)  # gripper tip
+        for obstacle in _guard["obstacles"]:
+            for p1, p2 in zip(points[:-1], points[1:]):
+                hit = obstacle.segment_hit(p1, p2)
+                if hit is not None:
+                    if env is not None:
+                        _show_marker(env, hit)
+                    return True
     return False
 
 
 def _hold_while_blocked(env, robot, q_remaining, dt):
     """Hold position (still rendering) until the remaining path is clear."""
-    markers = []
-    while _path_blocked(robot, q_remaining, env=None if markers else env, markers=markers):
+    shown = False
+    while _path_blocked(robot, q_remaining, env=None if shown else env):
+        shown = True  # the marker is drawn on the first hit only
         if _guard["on_blocked"] is not None:
             _guard["on_blocked"]("COLLISION PREDICTED - arm held. Clear the obstacle, then press Resume")
         env.step(dt)  # with the pendant attached, this freezes here until Resume is pressed
-    for marker in markers:
-        env.remove(marker)
+    if shown:
+        _hide_marker()
 
 
 def execute_move(env, robot, T_to, T_from=None, payload=None, steps=50, dt=0.05):
