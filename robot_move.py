@@ -1,3 +1,9 @@
+
+"""
+Function not used anymore, can likely be deleted prior to submission.
+It was used to move the robot to a specific position in the workspace, but this is now handled by move_arm_rmrc
+"""
+
 import roboticstoolbox as rtb
 from spatialmath import SE3
 

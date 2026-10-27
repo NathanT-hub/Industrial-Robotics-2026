@@ -17,74 +17,40 @@ def create_static_environment(env):
     surface_height = 0.60
     # Create a dictionary to hold all static items as a list of their parts (Shapes)
     static_items = {}
+    static_items["wallN1"] = create_wall(env, 2, 2, SE3.Trans(-1.4, 2.2, 0))
+    static_items["wallN2"] = create_wall(env, 1.2, 2, SE3.Trans(1, 2.2, 0))
+    static_items["wallW1"] = create_wall(env, 5.2, 2, SE3.Trans(-2.4, -0.4, 0)*SE3.Rz(pi/2))
+    static_items["wallE1"] = create_wall(env, 5.2, 2, SE3.Trans(1.6, -0.4, 0)*SE3.Rz(pi/2))
+    static_items["wallS1"] = create_wall(env, 2, 2, SE3.Trans(-1.4, -3, 0))
     static_items["assembly_bench"] = create_table(env, 0, 0, 0.40, 0.40, surface_height)
     static_items["arm1_table"] = create_table(env, 0, -0.45, 0.40, 0.40, surface_height) # 5cm gap to the assembly bench so DoBot6 can reach it
     static_items["arm2_table"] = create_table(env, -0.6, 0, 0.40, 0.40, surface_height)
     static_items["arm3_table"] = create_table(env, 0, 0.45, 0.40, 0.40, surface_height) # 5cm gap to the assembly bench so the reBot can reach it
     static_items["bearing_table"] = create_table(env, -1.2, 0, 0.40, 0.40, surface_height)
-    static_items["dispatch_table"] = create_table(env, 0, 0.9, 0.40, 0.40, surface_height) # 5cm gap to arm3_table so the reBot can reach it
-
     static_items["conveyor1"] = create_conveyor(env, 1.6, 0.4, surface_height, SE3.Trans(0.42, -1.2, 0) * SE3.Rz(pi/2))
-
-
+    static_items["dispatch_shelf"] = create_shelf(env, 0, 1, 0.40, 0.10, 0.8)
     # ---------------------------------------------------------------
     # Setting up workspace |safety features|
     # ---------------------------------------------------------------
-    # North wall (y=2.5), running along x
-    barrier1_pose = SE3(-1.739, 2.5, 0.0)
-    barrier2_pose = SE3(-0.580, 2.5, 0.0)
-    barrier3_pose = SE3(0.580, 2.5, 0.0)
-    barrier4_pose = SE3(1.739, 2.5, 0.0)
+    # South gate (y=-3, open side, closest to the camera)
+    curtain_south_pose1 = SE3(-0.4, -3, 0.0)
+    curtain_south_pose2 = SE3(1.6, -3, 0.0)
+    # North gate (y=2.2, far side inspection door)
+    curtain_north_pose1 = SE3(-0.4, 2.2, 0.0)
+    curtain_north_pose2 = SE3(0.4, 2.2, 0.0)
+    env.add(part_mesh("SafetyLightCurtain", pose=curtain_south_pose1, color="#e8491d"))
+    env.add(part_mesh("SafetyLightCurtain", pose=curtain_south_pose2, color="#e8491d"))
+    env.add(part_mesh("SafetyLightCurtain", pose=curtain_north_pose1, color="#e8491d"))
+    env.add(part_mesh("SafetyLightCurtain", pose=curtain_north_pose2, color="#e8491d"))
 
-    # East wall (x=2.5), running along y - rotated 90 degrees
-    barrier5_pose = SE3(2.5, -1.739, 0.0) * SE3.Rz(pi / 2)
-    barrier6_pose = SE3(2.5, -0.580, 0.0) * SE3.Rz(pi / 2)
-    barrier7_pose = SE3(2.5, 0.580, 0.0) * SE3.Rz(pi / 2)
-    barrier8_pose = SE3(2.5, 1.739, 0.0) * SE3.Rz(pi / 2)
-
-    # West wall (x=-2.5), running along y - rotated 90 degrees
-    barrier9_pose = SE3(-2.5, -1.739, 0.0) * SE3.Rz(pi / 2)
-    barrier10_pose = SE3(-2.5, -0.580, 0.0) * SE3.Rz(pi / 2)
-    barrier11_pose = SE3(-2.5, 0.580, 0.0) * SE3.Rz(pi / 2)
-    barrier12_pose = SE3(-2.5, 1.739, 0.0) * SE3.Rz(pi / 2)
-
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier1_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier2_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier3_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier4_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier5_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier6_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier7_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier8_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier9_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier10_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier11_pose, color="#f2c14e"))
-    env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier12_pose, color="#f2c14e"))
-
-    # South gate (y=-2.5, open side, closest to the camera)
-    light_curtain_left_pose = SE3(-2.5, -2.5, 0.0)
-    light_curtain_right_pose = SE3(2.5, -2.5, 0.0)
-
-    env.add(part_mesh("SafetyLightCurtain", pose=light_curtain_left_pose, color="#e8491d"))
-    env.add(part_mesh("SafetyLightCurtain", pose=light_curtain_right_pose, color="#e8491d"))
-
-    # Worker station: 1m outside the west wall (x=-2.5), near the gate,
-    # rotated to face the actual work (the table/UR3e at 0.6, 0.0)
-    worker_station_pose = SE3(-3.5, -2.5, 0.0) *trotz(pi)
-    estop_post_height = 2.0
-    estop_post_pose = worker_station_pose * SE3(0.15, 0, 1)
-    estop_post = Cuboid(scale=[0.15, 0.15, 2], pose=estop_post_pose, color="#555555")
-    env.add(estop_post)
-
-    # Button mounted on the made post
-    estop_pose = worker_station_pose * SE3(0, 0, estop_post_height/2) 
+    # # Button mounted on the made post
+    estop_pose = SE3(-0.6, -3.12, 1.2) * SE3.Rz(pi)
     env.add(part_mesh("emergencyStopWallMounted", pose=estop_pose, color="#cc0000"))
 
     # SafetyPerson standing beside the post, offset sideways so they don't
     # overlap it, facing the same direction (toward the cell)
-    safety_person_pose = worker_station_pose * SE3(0, 0.4, 0.0)
+    safety_person_pose = SE3(0, -3.4, 0.0) * SE3.Rz(-pi/2)
     env.add(part_mesh("SafetyPerson", pose=safety_person_pose))
-
 
     # Iterate through each list within the dictionary
     for item in static_items.values():
@@ -92,7 +58,6 @@ def create_static_environment(env):
         for part in item:
             env.add(part) # Add every individual part to the environment
     return env
-
 """
 Method to create a table with centre at x, y and dimensions length, width.
 Tabletop surface is at z = height
@@ -128,6 +93,47 @@ def create_table(env, x, y, length, width, height):
             )
             parts.append(leg)
     return parts
+
+def create_shelf(env, x, y, length, width, height):
+    thickness = 0.04
+    parts = []
+
+    # Shelf part dimensions length x width positioned with centre at x, y and top surface at z = height
+    shelf = Cuboid(
+        scale = [length, width, thickness],
+        pose = SE3.Trans(x, y, height - thickness/2)
+        # colour = [0.6, 0.6, 0.65, 1]
+    )
+    parts.append(shelf)
+
+    leg_height = height-thickness # Leg height based off shelf data
+    x_offset = length / 2 - thickness / 2 # Values to position legs at each corner with the radius tangential to outer edge of shelf
+    # Iterate through each corner of the shelf and generate a leg from the shelf to the ground
+    for dx in [-x_offset, x_offset]:
+        leg = Cuboid(
+            scale = [thickness, width, leg_height],
+            pose = SE3.Trans(x + dx, y, leg_height / 2),
+            color = [0.6, 0.6, 0.65, 1]
+        )
+        parts.append(leg)
+
+    brace = Cuboid(
+        scale = [length-2*thickness, thickness, thickness],
+        pose = SE3.Trans(x, y, height/4),
+        color = [0.6, 0.6, 0.65, 1]
+    )
+    parts.append(brace)
+    return parts
+
+def create_wall(env, length, height, base):
+    thickness = 0.08
+
+    wall = Cuboid(
+        scale = [length, thickness, height],
+        pose = base * SE3.Trans(0, -thickness / 2, height / 2),
+        color = [0.6, 0.6, 0.65, 1]
+    )
+    return [wall]
 
 def create_bearing(env, x, y, z, outer_diameter=0.032, inner_diameter=0.01, height=0.01):
     """
@@ -238,5 +244,16 @@ def run_conveyor(env, parts, start_y, stop_y, speed=0.2, dt=0.05):
 
 
 
+    # Keep as example code if barrier needed later
+    # barrier12_pose = SE3(-2.5, 1.739, 0.0) * SE3.Rz(pi / 2)
+    # env.add(part_mesh("barrier1.5x0.2x1m", pose=barrier12_pose, color="#f2c14e"))
+
+    # # Worker station: 1m outside the west wall (x=-2.5), near the gate,
+    # # rotated to face the actual work (the table/UR3e at 0.6, 0.0)
+    # worker_station_pose = SE3(-3.5, -2.5, 0.0) * SE3.Rz(pi)
+    # estop_post_height = 2.0
+    # estop_post_pose = worker_station_pose * SE3(0.15, 0, 1)
+    # estop_post = Cuboid(scale=[0.15, 0.15, 2], pose=estop_post_pose, color="#555555")
+    # env.add(estop_post)
 
 

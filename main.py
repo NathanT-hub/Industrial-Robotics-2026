@@ -18,9 +18,7 @@ from obstacle import Obstacle
 
 # Import robot models
 from DoBot6 import DoBot6
-
 from Robots.RS007N import RS007N
-
 from Robots.reBotB601 import ReBotB601
 
 def main():
@@ -29,7 +27,8 @@ def main():
 	env.launch(realtime=True)
 	create_static_environment(env)
 	
-	# Create the bearing on its own table, keep a direct handle to its parts (has to be created in main as it's not static)
+	# Create the bearing on its own table
+	# Keep a direct handle to its parts (has to be created in main as it's not static)
 	surface_height = 0.6
 	bearing_height = 0.01
 	bearing_x = -1.2  # centre of bearing_table
@@ -47,19 +46,19 @@ def main():
 	
 	# Add DoBot6 Robot into environment
 	# Base offset toward the assembly-bench and conveyor edges of arm1_table so both are within reach (~0.44m)
-	robot = DoBot6(base=SE3.Trans(0.10, -0.35, 0.6))
+	TomBot = DoBot6(base=SE3.Trans(0.10, -0.35, 0.6))
 	# Waiting pose = ready pose: folded elbow-up with the tool pointing down, well clear of the
 	# straight-up singularity at q = 0, so RMRC moves can start straight from here
 	q_ready = np.radians([-150, -20, 150, -35, -90, 30])
-	robot.q = q_ready
-	robot.add_to_env(env)
+	TomBot.q = q_ready
+	TomBot.add_to_env(env)
 
 	# Add RS007N Robot into environment
-	nathanBot = RS007N(base=SE3.Trans(-0.6, 0, 0.6))  # centre of arm2_table
+	nathanBot = RS007N(base=SE3.Trans(-0.6, 0, 0.6))  # Centre of arm2_table
 	nathanBot.add_to_env(env)
 
 	# Add reBot B601-DM Robot into environment
-	ryanBot = ReBotB601(base=SE3.Trans(0, 0.45, 0.6))  # centre of arm3_table
+	ryanBot = ReBotB601(base=SE3.Trans(0, 0.45, 0.6))  # Centre of arm3_table
 	# Waiting pose: folded with the gripper pointing down and out toward +x, clear of the
 	# straight-up home pose, which RMRC can't start cleanly from
 	q_ready_rebot = np.radians([0, -72, -80, 68, 0, 0])
@@ -71,16 +70,16 @@ def main():
 #----------------------------------------------------------------
 #					Step 0 | Initiate the teach/jog pendant
 #----------------------------------------------------------------
-	# attach() hooks env.step, so the pendant (and the E-stop) is serviced by every step the
+	# Attach() hooks env.step, so the pendant (and the E-stop) is serviced by every step the
 	# sequence below takes. Jogging is refused while auto_busy is True.
 	# On a PS4 Controller:
 	#						Circle = Estop
 	#						L3 BTN (left joystick) = Reset / resume
-	pendant = TeachPendant(env, {"DoBot6": robot, "RS007N": nathanBot, "reBot B601": ryanBot},
+	pendant = TeachPendant(env, {"DoBot6": TomBot, "RS007N": nathanBot, "reBot B601": ryanBot},
 						   min_tool_z=surface_height)
 	pendant.attach()
 	pendant.auto_busy = True
-
+   
 #---------------------------------------------------------------
 #				   Collision Avoidance test
 	# Test obstacle, parked off to the side (tune the centre to your scene). Drag it into a path with the sliders
@@ -110,17 +109,17 @@ def main():
 	T_grasp_wheel_place = SE3(wheel_place_x, wheel_place_y, wheel_grasp_z) * SE3.Rx(pi)
 
 	# 1) Move from the ready pose down to the wheel (nothing carried)
-	execute_move(env, robot, T_hover_wheel)
-	execute_move(env, robot, T_grasp_wheel)
+	execute_move(env, TomBot, T_hover_wheel)
+	execute_move(env, TomBot, T_grasp_wheel)
 
 	# 2) Lift and carry across to the assembly bench -- wheel follows the end-effector
-	execute_move(env, robot, T_hover_wheel, payload=wheel_parts)
-	execute_move(env, robot, T_hover_wheel_place, payload=wheel_parts)
-	execute_move(env, robot, T_grasp_wheel_place, payload=wheel_parts)
+	execute_move(env, TomBot, T_hover_wheel, payload=wheel_parts)
+	execute_move(env, TomBot, T_hover_wheel_place, payload=wheel_parts)
+	execute_move(env, TomBot, T_grasp_wheel_place, payload=wheel_parts)
 
 	# 3) Release, lift clear, then return to the waiting pose out of the way of the RS007N
-	execute_move(env, robot, T_hover_wheel_place)
-	execute_move(env, robot, robot.fkine(q_ready))
+	execute_move(env, TomBot, T_hover_wheel_place)
+	execute_move(env, TomBot, TomBot.fkine(q_ready))
 
 #----------------------------------------------------------------
 #					Step 3 | RS007N installs the bearing into the wheel hub
