@@ -12,6 +12,9 @@ from spatialmath.base import trotz
 import spatialgeometry as geometry
 import os
 
+WHEEL_MESH_LIFT = 0.0004705665342044085
+WHEEL_TOP_LOCAL_Z = 0.010403605177998543
+
 def create_static_environment(env):
     # Add all static items to swift environment
     surface_height = 0.60
@@ -28,7 +31,7 @@ def create_static_environment(env):
     static_items["arm3_table"] = create_table(env, 0, 0.45, 0.40, 0.40, surface_height) # 5cm gap to the assembly bench so the reBot can reach it
     static_items["bearing_table"] = create_table(env, -1.2, 0, 0.40, 0.40, surface_height)
     static_items["conveyor1"] = create_conveyor(env, 1.6, 0.4, surface_height, SE3.Trans(0.42, -1.2, 0) * SE3.Rz(pi/2))
-    static_items["dispatch_shelf"] = create_shelf(env, 0, 1, 0.40, 0.10, 0.8)
+    static_items["dispatch_shelf"] = create_shelf(env, 0, 0.85, 0.40, 0.10, 0.60)
     # ---------------------------------------------------------------
     # Setting up workspace |safety features|
     # ---------------------------------------------------------------
@@ -172,7 +175,7 @@ def create_wheel(env, x, y, z, yaw=0.0):
     rim_path = os.path.join(_MESH_DIR, 'wheel_rim.stl')
     tyre_path = os.path.join(_MESH_DIR, 'wheel_tyre.stl')
 
-    pose = SE3.Trans(x, y, z + 0.005) * SE3.Rz(yaw)
+    pose = SE3.Trans(x, y, z + WHEEL_MESH_LIFT) * SE3.Rz(yaw)
     rim = geometry.Mesh(rim_path, color=[0.75, 0.75, 0.78, 1], pose=pose)
     tyre = geometry.Mesh(tyre_path, color=[0.08, 0.08, 0.08, 1], pose=pose)
 

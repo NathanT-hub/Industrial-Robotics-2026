@@ -8,7 +8,7 @@ from math import pi
 from spatialgeometry import Cuboid
 
 # Import required files from GitHub Repo
-from create_static_environment import create_static_environment, create_bearing, create_wheel, run_conveyor
+from create_static_environment import create_static_environment, create_bearing, create_wheel, run_conveyor, WHEEL_MESH_LIFT, WHEEL_TOP_LOCAL_Z
 from robot_move import robot_move
 from move_arm_rmrc import move_arm_rmrc
 from execute_move import execute_move, set_collision_guard
@@ -30,6 +30,7 @@ def main():
 	# Create the bearing on its own table
 	# Keep a direct handle to its parts (has to be created in main as it's not static)
 	surface_height = 0.6
+	wheel_top_z = (surface_height + WHEEL_MESH_LIFT + WHEEL_TOP_LOCAL_Z)  # top of the wheel's tyre, for the reBot to grasp
 	bearing_height = 0.01
 	bearing_x = -1.2  # centre of bearing_table
 	bearing_parts = create_bearing(env, bearing_x, 0, surface_height, outer_diameter=0.032, inner_diameter=0.01, height= bearing_height)
@@ -55,6 +56,7 @@ def main():
 
 	# Add RS007N Robot into environment
 	nathanBot = RS007N(base=SE3.Trans(-0.6, 0, 0.6))  # Centre of arm2_table
+	nathanBot.q = np.array([0.3, -0.5, 0.6, 0.2, -0.4, 0.1])  # folded up over arm2_table
 	nathanBot.add_to_env(env)
 
 	# Add reBot B601-DM Robot into environment
@@ -102,9 +104,11 @@ def main():
 	wheel_place_x, wheel_place_y = 0, 0
 	# The wheel lies flat and its top is ~15mm above the surface; the DoBot6 Link6 mesh protrudes ~19mm
 	# past the end-effector frame, so grasp ~20mm above the wheel top so the flange face rests on it
-	wheel_grasp_z = surface_height + 0.0155 + 0.02
+	wheel_grasp_z = wheel_top_z + 0.02
 	T_hover_wheel = SE3(wheel_x, wheel_pick_y, 0.75) * SE3.Rx(pi)
 	T_grasp_wheel = SE3(wheel_x, wheel_pick_y, wheel_grasp_z) * SE3.Rx(pi) # flange on top of the wheel
+	T_wheel_via_1 = SE3(0.50, -0.35, 0.75) * SE3.Rx(pi)
+	T_wheel_via_2 = SE3(0.38, -0.07, 0.75) * SE3.Rx(pi)
 	T_hover_wheel_place = SE3(wheel_place_x, wheel_place_y, 0.75) * SE3.Rx(pi)
 	T_grasp_wheel_place = SE3(wheel_place_x, wheel_place_y, wheel_grasp_z) * SE3.Rx(pi)
 
@@ -114,22 +118,22 @@ def main():
 
 	# 2) Lift and carry across to the assembly bench -- wheel follows the end-effector
 	execute_move(env, TomBot, T_hover_wheel, payload=wheel_parts)
+	execute_move(env, TomBot, T_wheel_via_1, payload=wheel_parts)
+	execute_move(env, TomBot, T_wheel_via_2, payload=wheel_parts)
 	execute_move(env, TomBot, T_hover_wheel_place, payload=wheel_parts)
 	execute_move(env, TomBot, T_grasp_wheel_place, payload=wheel_parts)
 
 	# 3) Release, lift clear, then return to the waiting pose out of the way of the RS007N
 	execute_move(env, TomBot, T_hover_wheel_place)
+	execute_move(env, TomBot, T_wheel_via_2)
+	execute_move(env, TomBot, T_wheel_via_1)
 	execute_move(env, TomBot, TomBot.fkine(q_ready))
-
 #----------------------------------------------------------------
 #					Step 3 | RS007N installs the bearing into the wheel hub
 #----------------------------------------------------------------
-	q_start = [0.3, -0.5, 0.6, 0.2, -0.4, 0.1]
-	nathanBot.q = q_start
-
 	# Bearing drops into the rim's hub bore (32mm, same as the bearing OD) and sits flush with the wheel,
 	# whose underside is 5mm above the bench (see create_wheel)
-	wheel_base_z = surface_height + 0.005
+	wheel_base_z = surface_height + WHEEL_MESH_LIFT 
 
 	# Waypoints: hover above the bearing, descend to grasp, lift, carry, descend to install, release, lift
 	T_hover_pick  = SE3(bearing_x, 0, 0.75) * SE3.Rx(pi)
@@ -137,6 +141,7 @@ def main():
 	T_via         = SE3(-0.6, -0.6, 0.75) * SE3.Rx(pi)  # swing around the base -- a straight line bearing->bench passes through the robot
 	T_hover_place = SE3(wheel_place_x, wheel_place_y, 0.75) * SE3.Rx(pi)
 	T_grasp_place = SE3(wheel_place_x, wheel_place_y, wheel_base_z + bearing_height + 0.01) * SE3.Rx(pi)
+	T_pre_insert = SE3.Tz(0.02) * T_grasp_place # 2cm above the wheel hub, ready to drop the bearing in
 
 	# 1) Move down to the bearing (nothing carried)
 	execute_move(env, nathanBot, T_hover_pick)
@@ -146,7 +151,8 @@ def main():
 	execute_move(env, nathanBot, T_hover_pick, payload=bearing_parts)
 	execute_move(env, nathanBot, T_via, payload=bearing_parts)
 	execute_move(env, nathanBot, T_hover_place, payload=bearing_parts)
-	execute_move(env, nathanBot, T_grasp_place, payload=bearing_parts)
+	execute_move(env, nathanBot, T_pre_insert, payload=bearing_parts)
+	execute_move(env, nathanBot, T_grasp_place, payload=bearing_parts, dt=0.08)  # slower for the final drop-in
 
 	# 3) Release and retreat -- bearing stays installed in the wheel
 	execute_move(env, nathanBot, T_hover_place)
@@ -166,9 +172,9 @@ def main():
 		return SE3(x, y, z) * SE3.Rz(heading) * SE3.Ry(pi/2)
 
 	assembly_parts = wheel_parts + bearing_parts
-	dispatch_x, dispatch_y = 0, 0.9  # centre of dispatch_table
+	dispatch_x, dispatch_y = -0.15, 0.85  # centre of dispatch_table
 	# Gripper tip (the reBot's TCP) on top of the wheel, whose top face is ~15mm above the bench
-	assembly_grasp_z = wheel_base_z + 0.01
+	assembly_grasp_z = wheel_top_z
 
 	# Waypoints: hover above the assembly, descend to grasp, lift, swing round the +x side of the base
 	# (a straight line bench->dispatch passes through the robot), descend to place, release, lift
@@ -190,6 +196,7 @@ def main():
 
 	# 3) Release, lift clear, then return to the waiting pose
 	execute_move(env, ryanBot, T_hover_dispatch)
+	execute_move(env, ryanBot, T_via_rebot)
 	execute_move(env, ryanBot, ryanBot.fkine(q_ready_rebot))
 
 #----------------------------------------------------------------
