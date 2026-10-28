@@ -12,14 +12,22 @@ from spatialmath.base import trotz
 import spatialgeometry as geometry
 import os
 
+# Constant values used by multiple functions
 WHEEL_MESH_LIFT = 0.0004705665342044085
 WHEEL_TOP_LOCAL_Z = 0.010403605177998543
+FLOOR_GREY = [0.48, 0.50, 0.52, 1]
+STEEL_BLUE = [0.12, 0.25, 0.38, 1]
+LIGHT_METAL = [0.72, 0.75, 0.78, 1]
+DARK_METAL = [0.20, 0.23, 0.26, 1]
+SAFETY_YELLOW = [1, 0.78, 0.08, 1]
+AISLE_GREEN = [0.16, 0.39, 0.30, 1]
 
 def create_static_environment(env):
     # Add all static items to swift environment
     surface_height = 0.60
     # Create a dictionary to hold all static items as a list of their parts (Shapes)
     static_items = {}
+    static_items["factory_details"] = create_factory_details()
     static_items["wallN1"] = create_wall(env, 2, 2, SE3.Trans(-1.4, 2.2, 0))
     static_items["wallN2"] = create_wall(env, 1.2, 2, SE3.Trans(1, 2.2, 0))
     static_items["wallW1"] = create_wall(env, 5.2, 2, SE3.Trans(-2.4, -0.4, 0)*SE3.Rz(pi/2))
@@ -66,6 +74,65 @@ Method to create a table with centre at x, y and dimensions length, width.
 Tabletop surface is at z = height
 Returns a list containing 5 parts - 1 cuboid tabletop and 4 cylinder legs
 """
+
+def create_factory_details():
+    """
+    Create visual factory features within the existing scenario, such as floor markings and safety barriers.
+    """
+    parts = []
+
+    def box(size, position, colour):
+        parts.append(Cuboid(
+            scale=size,
+            pose=SE3.Trans(*position),
+            color=colour
+        ))
+
+    # Create floor
+    floor_top_z = 0.002
+    floor_thickness = 0.04
+    box([4, 5.2, floor_thickness], [-0.4, -0.4, floor_top_z-floor_thickness/2], FLOOR_GREY)
+
+    # Variables to ensure paint sits slightly above floor for good visibility and no flickering in Swift
+    paint_thickness = 0.001
+    surface_gap = 0.0005
+    paint_z = floor_top_z + surface_gap + paint_thickness/2
+
+    def floor_outline(cx, cy, length, width):
+        # Rectangular equipment boundary using yellow strips
+        line_width = 0.04
+
+        # Horizontal edges
+        for dy in [-width/2, width/2]:
+            box(
+                [length, line_width, paint_thickness],
+                [cx, cy + dy, paint_z],
+                SAFETY_YELLOW
+            )
+
+        # Vertical edges
+        for dx in [-length/2, length/2]:
+            box(
+                [line_width, width, paint_thickness],
+                [cx + dx, cy, paint_z],
+                SAFETY_YELLOW
+            )
+
+    # Aisle
+    aisle_x, aisle_y = 1.3, -0.4
+    aisle_length, aisle_width = 4.8, 0.4
+    edge_width = 0.025
+    box([aisle_width, aisle_length, paint_thickness], [aisle_x, aisle_y, paint_z], AISLE_GREEN)
+    # White edging alongside aisle
+    edge_z = (paint_z + paint_thickness/2 + surface_gap + paint_thickness/2)
+    for side in [-1, 1]:
+        edge_x = aisle_x + side * (aisle_width/2 + edge_width/2)
+        box([edge_width, aisle_length, paint_thickness], [edge_x, aisle_y, edge_z], [0.9, 0.92, 0.92, 1])
+
+    floor_outline(cx=-0.3, cy=-0.35, length=2.6, width=3.6)  # Assembly bench area
+    
+    return parts
+    
 def create_table(env, x, y, length, width, height):
     tabletop_thickness = 0.04
     leg_radius = 0.04
@@ -75,8 +142,8 @@ def create_table(env, x, y, length, width, height):
     # Tabletop part dimensions length x width positioned with centre at x, y and top surface at z = height
     tabletop = Cuboid(
         scale = [length, width, tabletop_thickness],
-        pose = SE3.Trans(x, y, height - tabletop_thickness/2)
-        # colour = [0.6, 0.6, 0.65, 1]
+        pose = SE3.Trans(x, y, height - tabletop_thickness/2),
+        color = LIGHT_METAL
     )
     parts.append(tabletop)
 
@@ -92,9 +159,32 @@ def create_table(env, x, y, length, width, height):
                 radius = leg_radius,
                 length = leg_height,
                 pose = SE3.Trans(x + dx, y + dy, leg_height / 2),
-                color = [0.6, 0.6, 0.65, 1]
+                color = STEEL_BLUE
             )
             parts.append(leg)
+
+    # Create a visible frame underneath the tabletop to support it, using 4 cuboids to represent the beams
+    frame_height = 0.06
+    frame_width = 0.025
+    frame_z = height - tabletop_thickness - frame_height/2
+
+    # Front and rear frame beams
+    for dy in [-width/2 + frame_width/2, width/2 - frame_width/2]:
+        frame = Cuboid(
+            scale = [length, frame_width, frame_height],
+            pose = SE3.Trans(x, y + dy, frame_z),
+            color = STEEL_BLUE
+        )
+        parts.append(frame)
+
+    # Side frame beams
+    for dx in [-length/2 + frame_width/2, length/2 - frame_width/2]:
+        frame = Cuboid(
+            scale = [frame_width, width, frame_height],
+            pose = SE3.Trans(x + dx, y, frame_z),
+            color = STEEL_BLUE
+        )
+        parts.append(frame)
     return parts
 
 def create_shelf(env, x, y, length, width, height):
@@ -104,8 +194,8 @@ def create_shelf(env, x, y, length, width, height):
     # Shelf part dimensions length x width positioned with centre at x, y and top surface at z = height
     shelf = Cuboid(
         scale = [length, width, thickness],
-        pose = SE3.Trans(x, y, height - thickness/2)
-        # colour = [0.6, 0.6, 0.65, 1]
+        pose = SE3.Trans(x, y, height - thickness/2),
+        color = LIGHT_METAL
     )
     parts.append(shelf)
 
@@ -116,7 +206,7 @@ def create_shelf(env, x, y, length, width, height):
         leg = Cuboid(
             scale = [thickness, width, leg_height],
             pose = SE3.Trans(x + dx, y, leg_height / 2),
-            color = [0.6, 0.6, 0.65, 1]
+            color = STEEL_BLUE
         )
         parts.append(leg)
 
@@ -166,7 +256,6 @@ def create_bearing(env, x, y, z, outer_diameter=0.032, inner_diameter=0.01, heig
     parts.append(bore)
 
     return parts
-
 #-------------------------------------------------------------------
 #--------------- Wheel STL file ------------------------------------
 _MESH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wheel_meshes')
@@ -182,8 +271,8 @@ def create_wheel(env, x, y, z, yaw=0.0):
     return [rim, tyre]
 
 def create_conveyor(env, length, width, height, base):
-    belt_color = (0.08, 0.08, 0.08, 1)
-    frame_color = (0.55, 0.55, 0.60, 1)
+    belt_color = (0.30, 0.32, 0.36, 1)
+    frame_color = LIGHT_METAL
 
     # Conveyor belt constants
     belt_thickness = 0.02
@@ -191,7 +280,6 @@ def create_conveyor(env, length, width, height, base):
     rail_height = 0.1
     leg_radius = 0.04
     roller_radius = 0.05
-
     leg_inset = 0.1
 
     parts = []
@@ -229,6 +317,18 @@ def create_conveyor(env, length, width, height, base):
         )
         parts.append(roller)
     parts.append(belt)
+
+    # Four support legs beneath the conveyor, inset from the ends and sides
+    support_height = height - rail_height
+    for local_x in [-length / 2 + leg_inset, length / 2 - leg_inset]:
+        for local_y in [-width / 2 + leg_inset, width / 2 - leg_inset]:
+            leg = Cylinder(
+                radius = leg_radius,
+                length = support_height,
+                pose = base * SE3.Trans(local_x, local_y, support_height / 2),
+                color = STEEL_BLUE
+            )
+            parts.append(leg)
 
     return parts
 
