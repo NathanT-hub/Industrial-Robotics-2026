@@ -50,7 +50,7 @@ def main():
 	TomBot = DoBot6(base=SE3.Trans(0.10, -0.35, 0.6))
 	# Waiting pose = ready pose: folded elbow-up with the tool pointing down, well clear of the
 	# straight-up singularity at q = 0, so RMRC moves can start straight from here
-	q_ready = np.radians([-150, -20, 150, -35, -90, 30])
+	q_ready = np.radians([-150, -20, 145, -30, -90, 30])
 	TomBot.q = q_ready
 	TomBot.add_to_env(env)
 

@@ -188,7 +188,7 @@ class TeachPendant:
 
     def add_obstacle_sliders(self, obstacle, lo=(-1.5, -2.0, 0.6), hi=(1.5, 1.5, 1.5)):
         """Sliders that move the test obstacle live (the sliders keep working while the arm is held)."""
-        self._add(swift.Label("━━ OBSTACLE ━━ drag into a robot's path"))
+        self._add(swift.Label("Test Obstacle"))
         for axis, name in enumerate("XYZ"):
             self._add(swift.Slider(lambda v, a=axis: self._move_obstacle(obstacle, a, float(v)),
                                 min=lo[axis], max=hi[axis], step=0.01,
@@ -209,7 +209,7 @@ class TeachPendant:
     def _build_panel(self):
         n_max = max(r.n for r in self.robots.values())
 
-        self._add(swift.Label("WHEEL ASSEMBLY CELL"))
+        self._add(swift.Label("WHEEL ASSEMBLY CELL")) #, compact=True))
         self.status_label = self._add(swift.Label(""))
         self._add(swift.Button(lambda _: self._press_estop(), "STOP - E-STOP"))
         self._add(swift.Button(lambda _: self._reset_estop(), "Reset E-stop"))
@@ -220,9 +220,16 @@ class TeachPendant:
         self._add(swift.Select(self._set_step, "Jog increment", [s[0] for s in STEP_SIZES], self.step_index))
 
         # Cartesian jog
-        self._add(swift.Label("TOOL POSITION | world frame"))
-        self.pose_label = self._add(swift.Label(""))
-        self.rpy_label = self._add(swift.Label(""))
+        self._add(swift.Label("TOOL POSITION | World frame", compact=True))
+        self.position_labels = [
+            self._add(swift.Label(f"{axis}: — m", compact=True))
+            for axis in ("X", "Y", "Z")
+            ]
+        self._add(swift.Label("TOOL ORIENTATION", compact=True))
+        self.orientation_labels = [
+            self._add(swift.Label(f"{axis}: — deg", compact=True))
+            for axis in ("Roll", "Pitch", "Yaw")
+            ]
         self._add(swift.Label("MOVE TOOL"))
         for axis, name in enumerate("XYZ"):
             for sign in (-1, 1):
@@ -601,8 +608,10 @@ class TeachPendant:
         for i in range(r.n):
             near = min(q[i] - lo[i], hi[i] - q[i]) < LIMIT_WARN
             joints.append(f"J{i + 1} {np.degrees(q[i]):+.1f}{'⚠' if near else ''}")
-        self._set_label(self.pose_label, f"Tool x y z: {T.t[0]:+.3f} {T.t[1]:+.3f} {T.t[2]:+.3f} m")
-        self._set_label(self.rpy_label, f"Tool r p y: {rpy[0]:+.1f} {rpy[1]:+.1f} {rpy[2]:+.1f} °")
+        for label, axis, value in zip(self.position_labels, ("X", "Y", "Z"), T.t):
+            self._set_label(label, f"{axis}: {value:+.3f} m")
+        for label, axis, value in zip(self.orientation_labels, ("Roll", "Pitch", "Yaw"), rpy):
+            self._set_label(label, f"{axis}: {value:+.1f} deg")
         self._set_label(self.joint_label, "Joints (°): " + "  ".join(joints))
         self._set_label(self.manip_label, f"Manipulability: {m:.2e} ({'LOW' if m < MANIP_WARN else 'ok'})"
                                           f" | Safety plane z = {self.min_tool_z:.3f} m")
@@ -638,7 +647,7 @@ class TeachPendant:
             return "Cartesian step"
         if self.joint_target is not None:
             return "joint move"
-        return "idle"
+        return "Idle"
 
     def _log(self, level, message):
         line = f"{time.strftime('%H:%M:%S')}  {LEVEL_TAG[level]}  {message}"
