@@ -56,7 +56,7 @@ MAX_QDOT = np.radians(90)    # cap on any joint's speed during a Cartesian move 
 LIMIT_WARN = np.radians(5)   # warn when a joint is this close to a limit
 MANIP_WARN = 1e-3            # warn below this manipulability (same threshold as move_arm_rmrc)
 MAX_DAMPING = 0.05           # damped least squares near singularities (as in move_arm_rmrc)
-LOG_LINES = 5                # recent events shown in the panel
+LOG_LINES = 3                # recent events shown in the panel
 SLIDER_STEP = 0.1            # joint slider resolution (deg)
 ECHO_HISTORY = 20            # recent slider values pushed by the pendant, see _slider_moved
 
@@ -88,6 +88,12 @@ class TeachPendant:
         self.env = env
         self.robots = dict(robots)
         self.names = list(self.robots)
+        role_labels = {
+            "DoBot6" : "Arm 1 | Wheel transfer",
+            "RS007N" : "Arm 2 | Bearing insertion",
+            "reBot B601" : "Arm 3 | Assembly storage"
+        }
+        self.robot_display_names = [role_labels.get(name, name) for name in self.names]
         self.min_tool_z = min_tool_z
         self.poses_file = poses_file
         self.start_q = {name: np.array(r.q, dtype=float) for name, r in self.robots.items()}
@@ -186,7 +192,7 @@ class TeachPendant:
         for axis, name in enumerate("XYZ"):
             self._add(swift.Slider(lambda v, a=axis: self._move_obstacle(obstacle, a, float(v)),
                                 min=lo[axis], max=hi[axis], step=0.01,
-                                value=float(obstacle.centre[axis]), desc=f"Obstacle {name}", unit="m"))
+                                value=float(obstacle.centre[axis]), desc=f"Test obstacle {name}", unit="m"))
 
     def _move_obstacle(self, obstacle, axis, value):
         centre = obstacle.centre.copy()
@@ -203,61 +209,66 @@ class TeachPendant:
     def _build_panel(self):
         n_max = max(r.n for r in self.robots.values())
 
-        self._add(swift.Label("━━ TEACH / JOG PENDANT ━━"))
+        self._add(swift.Label("WHEEL ASSEMBLY CELL"))
         self.status_label = self._add(swift.Label(""))
-        self._add(swift.Button(lambda _: self._press_estop(), "🛑 E-STOP"))
+        self._add(swift.Button(lambda _: self._press_estop(), "STOP - E-STOP"))
         self._add(swift.Button(lambda _: self._reset_estop(), "Reset E-stop"))
-        self._add(swift.Button(lambda _: self._resume(), "▶ Resume"))
-        self.robot_select = self._add(swift.Select(self._robot_selected, "Robot", self.names, 0))
+        self._add(swift.Button(lambda _: self._resume(), "Resume operation"))
+        self.robot_select = self._add(swift.Select(self._robot_selected, "Selected robot", self.robot_display_names, 0))
         self._add(swift.Slider(self._set_speed, min=5, max=100, step=5, value=int(self.speed * 100),
-                               desc="Speed", unit="%"))
-        self._add(swift.Select(self._set_step, "Step per click", [s[0] for s in STEP_SIZES], self.step_index))
-
-        # Joint jog
-        self._add(swift.Label("━━ JOINT JOG ━━ drag a slider, or step the selected joint"))
-        q0 = self._slider_values(self.robot)
-        self.slider_pushed = [[v] for v in q0]
-        self.joint_sliders = [
-            self._add(swift.Slider(lambda v, j=j: self._slider_moved(j, v), min=-180, max=180, step=SLIDER_STEP,
-                                   value=q0[j], desc=f"J{j + 1}", unit="°"))
-            for j in range(n_max)]
-        self._add(swift.Select(lambda i: setattr(self, "jog_joint", int(i)), "Step joint",
-                               [f"J{j + 1}" for j in range(n_max)], 0))
-        self._add(swift.Button(lambda _: self._step_joint(-1), "Joint −"))
-        self._add(swift.Button(lambda _: self._step_joint(+1), "Joint +"))
+                               desc="Manual motion speed", unit="%"))
+        self._add(swift.Select(self._set_step, "Jog increment", [s[0] for s in STEP_SIZES], self.step_index))
 
         # Cartesian jog
-        self._add(swift.Label("━━ CARTESIAN JOG ━━ world frame, tool orientation held"))
+        self._add(swift.Label("TOOL POSITION | world frame"))
+        self.pose_label = self._add(swift.Label(""))
+        self.rpy_label = self._add(swift.Label(""))
+        self._add(swift.Label("MOVE TOOL"))
         for axis, name in enumerate("XYZ"):
             for sign in (-1, 1):
                 self._add(swift.Button(lambda _, a=axis, s=sign: self._step_cartesian(a, s),
                                        f"{name} {'−' if sign < 0 else '+'}"))
 
+        # Joint jog
+        self._add(swift.Label("MOVE JOINTS"))
+        q0 = self._slider_values(self.robot)
+        self.slider_pushed = [[v] for v in q0]
+        self.joint_sliders = [
+            self._add(swift.Slider(lambda v, j=j: self._slider_moved(j, v), min=-180, max=180, step=SLIDER_STEP,
+                                   value=q0[j], desc=f"Joint {j + 1}", unit="°"))
+            for j in range(n_max)]
+        self._add(swift.Select(lambda i: setattr(self, "jog_joint", int(i)), "Joint to step",
+                               [f"J{j + 1}" for j in range(n_max)], 0))
+        self._add(swift.Button(lambda _: self._step_joint(-1), "Step selected joint -"))
+        self._add(swift.Button(lambda _: self._step_joint(+1), "Step selected join +"))
+
         # State
-        self._add(swift.Label("━━ STATE ━━"))
-        self.pose_label = self._add(swift.Label(""))
-        self.rpy_label = self._add(swift.Label(""))
+        self._add(swift.Label("DIAGNOSTICS"))
         self.joint_label = self._add(swift.Label(""))
         self.manip_label = self._add(swift.Label(""))
         self.pad_label = self._add(swift.Label(""))
         self.pad_map_label = self._add(swift.Label(""))
 
         # Taught poses
-        self._add(swift.Label("━━ TAUGHT POSES ━━"))
+        self._add(swift.Label("SAVED POSITIONS"))
         self.pose_select = self._add(swift.Select(lambda i: setattr(self, "selected_pose", int(i)),
-                                                  "Pose", ["(none)"], 0))
-        for desc, cmd in (("Record pose", self._record_pose), ("Go to pose", self._goto_selected),
-                          ("Delete pose", self._delete_pose), ("Go to start pose", self._goto_start),
-                          ("Save poses", self._save_poses), ("Load poses", self._load_poses)):
+                                                  "Saved position", ["(No positions recorded)"], 0))
+        for desc, cmd in (("Record current position", self._record_pose), 
+                          ("Move to selected position", self._goto_selected),
+                          ("Return to initial position", self._goto_start),
+                          ("Save positions to file", self._save_poses),
+                          ("Load positions from file", self._load_poses),
+                          ("Delete selected position", self._delete_pose)
+                            ):
             self._add(swift.Button(lambda _, c=cmd: c(), desc))
 
         # Recent events
-        self._add(swift.Label("━━ EVENT LOG ━━ newest first, full log in the terminal"))
+        self._add(swift.Label("RECENT EVENTS"))
         self.log_labels = [self._add(swift.Label("")) for _ in range(LOG_LINES)]
 
-    # ------------------------------------------------------------------
-    # Panel callbacks
-    # ------------------------------------------------------------------
+# ------------------------------------------------------------------
+# Panel callbacks
+# ------------------------------------------------------------------
     def _select_robot(self, index):
         self._stop_motion()
         self.robot_name = self.names[index]
@@ -363,11 +374,9 @@ class TeachPendant:
     def _refresh_pose_select(self):
         options = []
         for pose in self.taught:
-            r = self.robots.get(pose["robot"])
-            xyz = r.fkine(pose["q"]).t if r is not None else (np.nan,) * 3
-            options.append(f"{pose['name']} {pose['robot']} ({xyz[0]:+.3f}, {xyz[1]:+.3f}, {xyz[2]:+.3f})")
+            options.append(f"{pose['name']} | {pose['robot']}")
         self.selected_pose = min(self.selected_pose, max(len(options) - 1, 0))
-        self.pose_select.options = options or ["(none)"]
+        self.pose_select.options = options or ["No positions recorded"]
         self.pose_select.value = self.selected_pose
 
     def _goto_selected(self):
@@ -565,13 +574,23 @@ class TeachPendant:
         q = np.array(r.q, dtype=float)
 
         # Status line: the worst current condition, else the current activity
-        if self.conditions:
-            message, level = max(self.conditions.items(), key=lambda kv: kv[1])
+        if self.estop:
+            text = "E-STOP ACTIVE | Reset then Resume"
+        elif self.collision:
+            text = "PATH BLOCKED | Clear obstacle then resume"
+        elif self.awaiting_resume:
+            text = "PAUSED | Awaiting resume"
+        elif self.conditions:
+            message, level = max(self.conditions.items(), key = lambda item: item[1])
+            state = "FAULT" if level == FAULT else "WARNING"
             extra = len(self.conditions) - 1
-            text = (f"{LEVEL_ICON[level]} {'FAULT' if level == FAULT else 'WARNING'}: {message}"
-                    + (f" (+{extra} more)" if extra else ""))
+            text = f"{LEVEL_ICON[level]} {state} | {message}"
+            if extra:
+                text += f" (+{extra} more)"
+        elif self.auto_busy:
+            text = "AUTOMATIC | Assembly sequence running"
         else:
-            text = f"{LEVEL_ICON[OK]} READY - {self.robot_name} - {self._activity()}"
+            text = f"MANUAL | {self._activity()}"
         self._set_label(self.status_label, text)
 
         T = r.fkine(q)
@@ -705,9 +724,9 @@ class TeachPendant:
 
     def _pad_summary(self):
         if pygame is None:
-            return "🎮 Gamepad: pygame not installed - panel control only", ""
+            return "🎮 Controller | Unavailable - use panel controls", ""
         if self.gamepad is None:
-            return "🎮 Gamepad: none connected (plug one in at any time)", ""
+            return "🎮 Controller | Not connected", ""
         mapping = ("L-stick X/Y = world X/Y, R-stick Y = Z" if self.pad_mode == "cartesian"
                    else f"D-pad selects joint, L-stick Y jogs J{self.pad_joint + 1}")
         return (f"🎮 {self.gamepad.get_name()[:40]} - mode {self.pad_mode.upper()} (A toggles)",
